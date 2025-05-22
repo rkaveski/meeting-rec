@@ -1,0 +1,4 @@
+include resources/meetingrec.icns
+include resources/dmg_background.png
+include resources/DMG_README.rtf
+recursive-include meetingrec/resources *
