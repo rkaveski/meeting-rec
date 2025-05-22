@@ -119,6 +119,13 @@ Key configuration options:
 - Create mocks for OpenAI API in test environments
 - Add CI/CD pipeline for automated testing
 
+### Alternative AI Models
+
+- Add support for open-source AI models beyond OpenAI
+- Implement local transcription using models like Whisper locally
+- Provide options for different AI providers
+- Allow custom API endpoints for self-hosted models
+
 ## License
 
 This software is released under the GNU General Public License (GPL), which guarantees your freedom to share and change this software. For more details, see the [GNU GPL](https://www.gnu.org/licenses/gpl-3.0.en.html).
