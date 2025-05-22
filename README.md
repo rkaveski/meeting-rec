@@ -1,6 +1,6 @@
 # MeetingRec
 
-MeetingRec is an AI-powered meeting recorder and transcription tool for macOS. It lives in your menu bar, allowing you to easily record meetings, capture screenshots, and generate transcriptions and summaries using OpenAI.
+MeetingRec is an AI-powered meeting recorder and transcription tool for macOS. It lives in your menu bar, allowing you to easily record meetings, capture screenshots, and generate transcriptions using OpenAI.
 
 ## Features
 
