@@ -4,6 +4,7 @@ import threading
 import subprocess
 import sys
 import logging
+
 from pathlib import Path
 
 from meetingrec.audio_recorder import AudioRecorder

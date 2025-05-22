@@ -75,3 +75,6 @@ credentials.json
 **/screenshots/
 **/transcripts/
 **/ai_chat.json
+
+# Agent guidelines
+AGENT.md

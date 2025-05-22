@@ -25,7 +25,7 @@ from CoreAudio import (
 )
 
 from meetingrec.config_manager import ConfigManager
-from meetingrec.error_manager import error_manager, safe_execute, RecordingError, DependencyError
+from meetingrec.error_manager import error_manager, safe_execute, RecordingError
 from meetingrec.transcription_service import TranscriptionService
 
 logger = logging.getLogger("meetingrec.audio_recorder")

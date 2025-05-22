@@ -1,7 +1,6 @@
 import sys
 import logging
 import traceback
-import subprocess
 import rumps
 
 from enum import Enum
