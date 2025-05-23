@@ -2,7 +2,7 @@
 
 MeetingRec is an AI-powered meeting recorder and transcription tool for macOS that I created because I needed a lightweight solution to capture and analyze my meetings.
 
-I found that existing solutions were either expensive subscriptions or required running resource-intensive local LLM models that bogged down my computer. My approach was different - build a simple tool that records meetings, transcribes the audio, and generates a clean markdown file that I can then feed into any LLM I already have access to (like ChatGPT, Claude, or DeepSeek).
+I found that existing solutions were either expensive subscriptions or required running resource-intensive local LLM models that bogged down my computer. My approach was different - build a simple tool that records meetings, transcribes the audio, take screenshots and generates a clean markdown file that I can then feed into any LLM I already have access to (like ChatGPT, Claude, or DeepSeek).
 
 This way, I can chat about my meetings and extract insights without paying for yet another AI subscription - I just use the accounts I already have!
 
