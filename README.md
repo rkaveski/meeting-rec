@@ -1,6 +1,16 @@
 # MeetingRec
 
-MeetingRec is an AI-powered meeting recorder and transcription tool for macOS. It lives in your menu bar, allowing you to easily record meetings, capture screenshots, and generate transcriptions using OpenAI.
+MeetingRec is an AI-powered meeting recorder and transcription tool for macOS that I created because I needed a lightweight solution to capture and analyze my meetings.
+
+I found that existing solutions were either expensive subscriptions or required running resource-intensive local LLM models that bogged down my computer. My approach was different - build a simple tool that records meetings, transcribes the audio, and generates a clean markdown file that I can then feed into any LLM I already have access to (like ChatGPT, Claude, or DeepSeek).
+
+This way, I can chat about my meetings and extract insights without paying for yet another AI subscription - I just use the accounts I already have!
+
+MeetingRec lives in your menu bar, making it easy to start/stop recordings and capture screenshots with a single click. The OpenAI-powered transcription creates comprehensive markdown reports that you can use anywhere.
+
+Feel free to fork this project and adapt it to your needs, or simply run it as-is for a cost-effective alternative to commercial meeting assistants. While it may have fewer bells and whistles than paid apps (for now!), it gets the job done without the ongoing costs.
+
+If you're interested in helping build a free, open-source meeting AI assistant, I'd love your contributions - pull requests are welcome!
 
 ## Features
 
