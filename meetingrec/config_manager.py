@@ -11,32 +11,30 @@ class ConfigManager:
     
     DEFAULT_CONFIG = {
         "meetingrec": {
-            "api_keys": {
-                "openai": ""
-            },
             "output_dir": str(Path.home() / "MeetingRec" / "meetings"),
             "audio": {
-                "format": "mp3",
-                "sample_rate": 44100,
-                "channel": "stereo"
+                "format": "mp3",       
+                "sample_rate": 44100,  
+                "channel": "stereo"    
             },
             "screenshot": {
-                "format": "jpg",
-                "quality": 85
+                "format": "jpg",       
+                "quality": 85 # Image quality (for jpg)
             },
             "markdown": {
                 "max_image_width": 1200,
                 "jpeg_quality": 85,
-                "transcript_wait_seconds": 60,
+                "transcript_wait_seconds": 1800,
             },
             "meeting_app_detection": {
                 "enabled": True
             },
             "ai": {
-                "model": "gpt-4o",
-                "temperature": 0.2,
-                "max_tokens": 2048,
-                "whisper_model": "whisper-1"
+                "openai_api_key": "",           
+                "model": "gpt-4o",              
+                "temperature": 0.2,             
+                "max_tokens": 2048,             
+                "whisper_model": "whisper-1"    
             }
         }
     }
@@ -78,32 +76,6 @@ class ConfigManager:
     
     def _create_default_config(self) -> None:
         """Create a default configuration file with documentation."""
-        default_config = {
-            "meetingrec": {
-                "output_dir": str(Path.home() / "MeetingRec" / "meetings"),  # Changed from Documents/MeetingRec
-                "audio": {
-                    "format": "mp3",       # Output audio format (mp3, wav, m4a)
-                    "sample_rate": 44100,  # Audio sample rate
-                    "channel": "stereo",   # mono or stereo
-                },
-                "screenshot": {
-                    "format": "jpg",       # Output image format
-                    "quality": 85,         # Image quality (for jpg)
-                },
-                "markdown": {              # Markdown section
-                    "max_image_width": 1200,
-                    "jpeg_quality": 85,
-                    "transcript_wait_seconds": 60,
-                },
-                "ai": {
-                    "openai_api_key": "",  # OpenAI API key for transcription and AI features
-                    "whisper_model": "whisper-1",  # OpenAI Whisper model for transcription
-                    "gpt_model": "gpt-4o",  # GPT model for summaries and insights
-                    "temperature": 0.2,     # AI temperature parameter
-                }
-            }
-        }
-        
         # Create config directory if it doesn't exist
         self.config_dir.mkdir(parents=True, exist_ok=True)
         
@@ -114,44 +86,51 @@ class ConfigManager:
             
             f.write("meetingrec:\n")
             f.write("  # Directory where meeting recordings are saved\n")
-            f.write(f"  output_dir: {default_config['meetingrec']['output_dir']}\n\n")
+            f.write(f"  output_dir: {self.DEFAULT_CONFIG['meetingrec']['output_dir']}\n\n")
             
             f.write("  # Audio recording settings\n")
             f.write("  audio:\n")
             f.write("    # Output audio format (mp3, wav, m4a)\n")
-            f.write(f"    format: {default_config['meetingrec']['audio']['format']}\n")
+            f.write(f"    format: {self.DEFAULT_CONFIG['meetingrec']['audio']['format']}\n")
             f.write("    # Audio sample rate\n")
-            f.write(f"    sample_rate: {default_config['meetingrec']['audio']['sample_rate']}\n")
+            f.write(f"    sample_rate: {self.DEFAULT_CONFIG['meetingrec']['audio']['sample_rate']}\n")
             f.write("    # Audio channel (mono, stereo)\n")
-            f.write(f"    channel: {default_config['meetingrec']['audio']['channel']}\n\n")
+            f.write(f"    channel: {self.DEFAULT_CONFIG['meetingrec']['audio']['channel']}\n\n")
             
             f.write("  # Screenshot settings\n")
             f.write("  screenshot:\n")
             f.write("    # Output image format (jpg)\n")
-            f.write(f"    format: {default_config['meetingrec']['screenshot']['format']}\n")
+            f.write(f"    format: {self.DEFAULT_CONFIG['meetingrec']['screenshot']['format']}\n")
             f.write("    # Image quality (for jpg)\n")
-            f.write(f"    quality: {default_config['meetingrec']['screenshot']['quality']}\n\n")
+            f.write(f"    quality: {self.DEFAULT_CONFIG['meetingrec']['screenshot']['quality']}\n\n")
             
             f.write("  # Markdown export settings\n")
             f.write("  markdown:\n")
             f.write("    # Maximum width for embedded images (in pixels)\n")
-            f.write(f"    max_image_width: {default_config['meetingrec']['markdown']['max_image_width']}\n")
+            f.write(f"    max_image_width: {self.DEFAULT_CONFIG['meetingrec']['markdown']['max_image_width']}\n")
             f.write("    # JPEG quality for embedded images (0-100)\n")
-            f.write(f"    jpeg_quality: {default_config['meetingrec']['markdown']['jpeg_quality']}\n")
+            f.write(f"    jpeg_quality: {self.DEFAULT_CONFIG['meetingrec']['markdown']['jpeg_quality']}\n")
             f.write("    # Maximum seconds to wait for transcript generation\n")
-            f.write(f"    transcript_wait_seconds: {default_config['meetingrec']['markdown']['transcript_wait_seconds']}\n")
+            f.write(f"    transcript_wait_seconds: {self.DEFAULT_CONFIG['meetingrec']['markdown']['transcript_wait_seconds']}\n\n")
+            
+            f.write("  # Meeting app detection settings\n")
+            f.write("  meeting_app_detection:\n")
+            f.write("    # Enable automatic detection of meeting applications\n")
+            f.write(f"    enabled: {self.DEFAULT_CONFIG['meetingrec']['meeting_app_detection']['enabled']}\n\n")
             
             f.write("  # AI settings (for transcription and insights)\n")
             f.write("  ai:\n")
             f.write("    # Your OpenAI API key - required for transcription and AI features\n")
             f.write("    # Get your API key from: https://platform.openai.com/api-keys\n")
-            f.write(f"    openai_api_key: {default_config['meetingrec']['ai'].get('openai_api_key', '')}\n")
+            f.write(f"    openai_api_key: {self.DEFAULT_CONFIG['meetingrec']['ai']['openai_api_key']}\n")
             f.write("    # Whisper model for transcription\n")
-            f.write(f"    whisper_model: {default_config['meetingrec']['ai']['whisper_model']}\n")
+            f.write(f"    whisper_model: {self.DEFAULT_CONFIG['meetingrec']['ai']['whisper_model']}\n")
             f.write("    # GPT model for summaries and insights\n")
-            f.write(f"    gpt_model: {default_config['meetingrec']['ai']['gpt_model']}\n")
+            f.write(f"    model: {self.DEFAULT_CONFIG['meetingrec']['ai']['model']}\n")
             f.write("    # AI temperature parameter (0.0-1.0, lower = more focused)\n")
-            f.write(f"    temperature: {default_config['meetingrec']['ai']['temperature']}\n")
+            f.write(f"    temperature: {self.DEFAULT_CONFIG['meetingrec']['ai']['temperature']}\n")
+            f.write("    # Maximum tokens for AI responses\n")
+            f.write(f"    max_tokens: {self.DEFAULT_CONFIG['meetingrec']['ai']['max_tokens']}\n")
         
         print(f"Created default configuration at {self.config_path}")
     
@@ -180,21 +159,15 @@ class ConfigManager:
     
     def get_openai_api_key(self) -> str:
         """Get the OpenAI API key."""
-        # Try both possible locations
-        try:
-            # First try the new location (in ai section)
-            return self.config["meetingrec"]["ai"]["openai_api_key"]
-        except (KeyError, TypeError):
-            try:
-                # Then try the old location (in api_keys section)
-                return self.config["meetingrec"]["api_keys"]["openai"]
-            except (KeyError, TypeError):
-                # If neither exists, return empty string
-                return ""
+        return self.config["meetingrec"]["api_keys"].get("openai", "")
     
     def set_openai_api_key(self, api_key: str) -> None:
         """Set the OpenAI API key."""
-        self.config["meetingrec"]["api_keys"]["openai"] = api_key
+        # Ensure ai section exists
+        if "ai" not in self.config["meetingrec"]:
+            self.config["meetingrec"]["ai"] = {}
+        
+        self.config["meetingrec"]["ai"]["openai_api_key"] = api_key
     
     def get_output_dir(self) -> str:
         """Get the output directory for meeting data."""
