@@ -1,9 +1,34 @@
 import rumps
 import logging
+import importlib.util
+import sys
 
+from pathlib import Path
 from typing import Dict, Callable, Optional
 
 logger = logging.getLogger("meetingrec.menu_manager")
+
+def get_version() -> str:
+    """Get the application version from setup.py"""
+    try:
+        # Find the setup.py file in the parent directory
+        setup_path = Path(__file__).resolve().parent.parent / "setup.py"
+        
+        if not setup_path.exists():
+            logger.warning(f"setup.py not found at {setup_path}")
+            return "Unknown"
+            
+        # Load the setup module
+        spec = importlib.util.spec_from_file_location("setup", setup_path)
+        setup = importlib.util.module_from_spec(spec)
+        sys.modules["setup"] = setup
+        spec.loader.exec_module(setup)
+        
+        # Return the VERSION from setup.py
+        return f"v{setup.VERSION}"
+    except Exception as e:
+        logger.error(f"Error getting version: {e}")
+        return "Unknown"
 
 class MenuManager:
     """
@@ -42,6 +67,27 @@ class MenuManager:
         show_meetings = self._create_menu_item("show_meetings", "Show Meetings")
         open_config = self._create_menu_item("open_config", "Open Config")
         
+        # Create version item (will show as disabled)
+        version_text = "v. Unknown"
+        try:
+            # Read version directly from the file without importing
+            import re
+            from pathlib import Path
+            
+            setup_path = Path(__file__).resolve().parent.parent / "setup.py"
+            if setup_path.exists():
+                with open(setup_path, 'r') as f:
+                    content = f.read()
+                    # Look for VERSION = "x.y.z" pattern
+                    match = re.search(r'VERSION\s*=\s*["\']([^"\']+)["\']', content)
+                    if match:
+                        version_text = f"v. {match.group(1)}"
+        except Exception as e:
+            logger.error(f"Error reading version: {e}")
+        
+        version_item = rumps.MenuItem(version_text)
+        version_item.set_callback(None)  # No callback
+        
         # Set the app's menu directly
         self.app.menu = [
             start_recording,
@@ -50,8 +96,13 @@ class MenuManager:
             capture_screenshot,
             None,  # separator
             show_meetings,
-            open_config
+            open_config,
+            None,  # separator
+            version_item
         ]
+        
+        # Store reference to version item
+        self.menu_items["version"] = version_item
         
         logger.info(f"Menu structure created with {len(self.menu_items)} items")
     
