@@ -105,26 +105,52 @@ Key configuration options:
 
 ## To-Do & Future Enhancements
 
-### Speaker Identification
+### Feature Enhancements
+
+#### Speaker Identification
 
 - Identify and label different speakers in meeting transcriptions
 - Add speaker profile management
 - Implement AI-based speaker diarization
 - Allow manual speaker labeling for corrections
 
-### Testing Infrastructure
-
-- Add unit tests for core modules
-- Implement integration tests for the complete recording pipeline
-- Create mocks for OpenAI API in test environments
-- Add CI/CD pipeline for automated testing
-
-### Alternative AI Models
+#### Alternative AI Models
 
 - Add support for open-source AI models beyond OpenAI
 - Implement local transcription using models like Whisper locally
 - Provide options for different AI providers
 - Allow custom API endpoints for self-hosted models
+
+### Technical Improvements
+
+#### Component Decoupling
+
+- Refactor AudioRecorder, ScreenshotCapture, and TranscriptionService to use interface-based design
+- Implement a plugin architecture to allow extending with new recording or transcription methods
+- Move file handling logic to dedicated file management service
+- Separate UI logic from core application functions
+
+#### Configuration Management
+
+- Establish a single source of truth for default configuration values
+- Improve separation between config storage and config access
+- Implement configuration validation
+- Add support for environment variables and command-line overrides
+
+#### Testing Infrastructure
+
+- Add unit tests for core modules with proper dependency injection
+- Implement integration tests for the complete recording pipeline
+- Create mocks for OpenAI API and audio devices in test environments
+- Add CI/CD pipeline for automated testing
+- Develop test fixtures for common testing scenarios
+
+#### Error Handling Strategy
+
+- Develop a consistent approach to error handling across the codebase
+- Separate error detection from error reporting
+- Improve user-facing error messages and recovery options
+- Add detailed logging for debugging purposes
 
 ## License
 
