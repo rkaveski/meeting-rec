@@ -197,7 +197,7 @@ class ConfigManager:
             self.config["meetingrec"]["markdown"] = {
                 "max_image_width": 1200,
                 "jpeg_quality": 85,
-                "transcript_wait_seconds": 180
+                "transcript_wait_seconds": 1800
             }
         return self.config["meetingrec"]["markdown"]
     

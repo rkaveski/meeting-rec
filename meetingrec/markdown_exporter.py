@@ -7,39 +7,39 @@ import time
 
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from PIL import Image
+
+from meetingrec.config_manager import ConfigManager
 
 logger = logging.getLogger("meetingrec.markdown_exporter")
 
 class MarkdownExporter:
     """Exports meeting data to markdown format."""
     
-    def __init__(self, config_manager=None, max_image_width=1200, jpeg_quality=85, transcript_wait_seconds=60):
-        """
-        Initialize the MarkdownExporter with image processing settings.
+    def __init__(self, config_manager=None, max_image_width=None, jpeg_quality=None, transcript_wait_seconds=None):
+        """Initialize the markdown exporter.
         
         Args:
-            config_manager: Optional configuration manager
-            max_image_width: Maximum width to resize images to before embedding
-            jpeg_quality: JPEG compression quality (0-100) for embedded images
-            transcript_wait_seconds: Maximum seconds to wait for transcript generation
+            config_manager: Optional config manager instance
+            max_image_width: Maximum width for embedded images
+            jpeg_quality: JPEG quality for embedded images
+            transcript_wait_seconds: Maximum seconds to wait for transcript
         """
-        self.max_image_width = max_image_width
-        self.jpeg_quality = jpeg_quality
-        self.transcript_wait_seconds = transcript_wait_seconds
+        self.config_manager = config_manager or ConfigManager()
         
-        # If config_manager is provided, use its settings
-        if config_manager:
-            try:
-                markdown_config = config_manager.get_markdown_config()
-                self.max_image_width = markdown_config.get("max_image_width", max_image_width)
-                self.jpeg_quality = markdown_config.get("jpeg_quality", jpeg_quality)
-                self.transcript_wait_seconds = markdown_config.get("transcript_wait_seconds", transcript_wait_seconds)
-
-                logger.info("Initialized MarkdownExporter")
-            except Exception as e:
-                logger.warning(f"Could not load markdown config from config_manager: {e}")
+        # Get defaults from config manager if values not provided
+        markdown_config = self.config_manager.get_markdown_config()
+        self.max_image_width = max_image_width or markdown_config["max_image_width"]
+        self.jpeg_quality = jpeg_quality or markdown_config["jpeg_quality"]
+        self.transcript_wait_seconds = transcript_wait_seconds or markdown_config["transcript_wait_seconds"]
+    
+    def get_markdown_config(self) -> Dict[str, Any]:
+        """Get markdown export configuration."""
+        # Check if the section exists, if not create it with defaults
+        if "markdown" not in self.config["meetingrec"]:
+            self.config["meetingrec"]["markdown"] = self.DEFAULT_CONFIG["meetingrec"]["markdown"]
+        return self.config["meetingrec"]["markdown"]
     
     def generate_report(self, meeting_path: Path) -> Path:
         """

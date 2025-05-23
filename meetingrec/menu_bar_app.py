@@ -39,12 +39,9 @@ class MeetingRecApp(rumps.App):
         # Get markdown configuration
         markdown_config = self.config_manager.get_markdown_config()
 
-        # Initialize the MarkdownExporter with configuration
+        # Let the MarkdownExporter get defaults from config_manager
         self.markdown_exporter = MarkdownExporter(
-            config_manager=self.config_manager,
-            max_image_width=markdown_config.get("max_image_width", 1200),
-            jpeg_quality=markdown_config.get("jpeg_quality", 85),
-            transcript_wait_seconds=markdown_config.get("transcript_wait_seconds", 180)
+            config_manager=self.config_manager
         )
 
         # Track current meeting
