@@ -1,0 +1,5 @@
+"""Version information for MeetingRec."""
+# This file is auto-generated during the build process.
+# Do not edit directly - changes will be overwritten.
+
+VERSION = "__VERSION__"

@@ -68,22 +68,13 @@ class MenuManager:
         open_config = self._create_menu_item("open_config", "Open Config")
         
         # Create version item (will show as disabled)
-        version_text = "v. Unknown"
         try:
-            # Read version directly from the file without importing
-            import re
-            from pathlib import Path
-            
-            setup_path = Path(__file__).resolve().parent.parent / "setup.py"
-            if setup_path.exists():
-                with open(setup_path, 'r') as f:
-                    content = f.read()
-                    # Look for VERSION = "x.y.z" pattern
-                    match = re.search(r'VERSION\s*=\s*["\']([^"\']+)["\']', content)
-                    if match:
-                        version_text = f"v. {match.group(1)}"
-        except Exception as e:
-            logger.error(f"Error reading version: {e}")
+            # Import from our auto-generated version module
+            from meetingrec.version import VERSION
+            version_text = f"Version: {VERSION}"
+        except ImportError as e:
+            logger.error(f"Error importing version: {e}")
+            version_text = "Version: Unknown"
         
         version_item = rumps.MenuItem(version_text)
         version_item.set_callback(None)  # No callback
