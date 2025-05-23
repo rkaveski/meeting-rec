@@ -159,7 +159,11 @@ class ConfigManager:
     
     def get_openai_api_key(self) -> str:
         """Get the OpenAI API key."""
-        return self.config["meetingrec"]["api_keys"].get("openai", "")
+        try:
+            return self.config["meetingrec"]["ai"].get("openai_api_key", "")
+        except (KeyError, TypeError):
+            # If the path doesn't exist, return empty string
+            return ""
     
     def set_openai_api_key(self, api_key: str) -> None:
         """Set the OpenAI API key."""
@@ -167,6 +171,7 @@ class ConfigManager:
         if "ai" not in self.config["meetingrec"]:
             self.config["meetingrec"]["ai"] = {}
         
+        # Set key in the primary location
         self.config["meetingrec"]["ai"]["openai_api_key"] = api_key
     
     def get_output_dir(self) -> str:
