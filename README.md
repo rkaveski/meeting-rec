@@ -23,7 +23,8 @@ If you're interested in helping build a free, open-source meeting AI assistant, 
 ## Module Overview
 
 - **menu_bar_app.py**: Main application entry point, implements the menu bar UI and core application logic
-- **audio_recorder.py**: Handles audio recording with both microphone and system audio capture
+- **system_audio_recorder.py**: Handles audio recording with both microphone and system audio capture
+- **recording_workflow_service.py**: Orchestrates the complete recording workflow and manages recording state
 - **screenshot_capture.py**: Manages screenshot functionality with window detection
 - **markdown_exporter.py**: Generates formatted markdown reports from meeting data
 - **config_manager.py**: Manages application configuration via YAML files
@@ -44,8 +45,8 @@ If you're interested in helping build a free, open-source meeting AI assistant, 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/meetingrec.git
-cd meetingrec
+git clone https://github.com/rkaveski/meeting-rec.git
+cd meeting-rec
 ```
 
 2. Install dependencies:
@@ -57,7 +58,7 @@ pip install -r requirements.txt
 3. Run the app in development mode:
 
 ```bash
-python -m meetingrec.menu_bar_app
+python3 run.py
 ```
 
 4. On first run, you'll be prompted to set up your OpenAI API key in the configuration file.
@@ -75,7 +76,7 @@ pip install -r requirements.txt
 2. Run the application directly:
 
 ```bash
-python run.py
+python3 run.py
 ```
 
 3. For rapid development, you can also run specific modules:
@@ -85,7 +86,7 @@ python run.py
 python -m meetingrec.menu_bar_app
 
 # Test audio recording
-python -m meetingrec.audio_recorder
+python -m meetingrec.system_audio_recorder
 ```
 
 4. Configure development settings in `~/.meetingrec/config.yaml`
@@ -97,7 +98,7 @@ To build a standalone macOS application:
 1. Run the build script:
 
 ```bash
-python build_app.py
+python3 build_app.py
 ```
 
 2. The built application will be in the `dist` folder
