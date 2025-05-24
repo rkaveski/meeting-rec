@@ -23,7 +23,6 @@ OPTIONS = {
     'includes': [
         'rumps',
         'pynput',
-        'pyaudio',
         'numpy',
         'pyobjc-core',
         'pyobjc-framework-Cocoa',
@@ -47,7 +46,6 @@ setup(
     install_requires=[
         'rumps>=0.4.0',
         'pynput>=1.7.6',
-        'pyaudio>=0.2.11',
         'numpy>=1.20.0',
         'pyobjc-core>=8.0',
         'pyobjc-framework-Cocoa>=8.0',

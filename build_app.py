@@ -78,7 +78,8 @@ def build_app():
 def code_sign_app():
     """Code sign the app (optional, requires Apple Developer account)."""
     print("Code signing is optional and requires an Apple Developer account.")
-    should_sign = input("Do you want to code sign the app? (y/n): ").lower() == 'y'
+    print("Skipping code signing.")
+    should_sign = False
     
     if should_sign:
         identity = input("Enter your Developer ID Application identity: ")

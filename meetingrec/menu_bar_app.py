@@ -1,53 +1,94 @@
 import os
 import rumps
-import threading
 import subprocess
 import sys
 import logging
+import threading
+import queue
+from functools import wraps
 
-from pathlib import Path
-
-from meetingrec.audio_recorder import AudioRecorder
-from meetingrec.markdown_exporter import MarkdownExporter
-from meetingrec.screenshot_capture import ScreenshotCapture
+from meetingrec.recording_workflow_service import RecordingWorkflowService
 from meetingrec.config_manager import ConfigManager
 from meetingrec.error_manager import error_manager, safe_execute, safe_notification
 from meetingrec.menu_manager import MenuManager
+from meetingrec.system_audio_recorder import FFmpegDependencyManager
 
-# Get logger
 logger = logging.getLogger("meetingrec.menu_bar")
 
+# Thread-safe UI operations queue
+ui_operation_queue = queue.Queue()
+
+
+def safe_main_thread(func):
+    """Decorator to ensure function runs on main thread with fallback for older rumps versions"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if hasattr(rumps, 'main_thread'):
+            # Use rumps.main_thread if available
+            @rumps.main_thread
+            def run_on_main():
+                return func(*args, **kwargs)
+            return run_on_main()
+        else:
+            # Fallback: Check if we're already on main thread
+            if threading.current_thread() is threading.main_thread():
+                return func(*args, **kwargs)
+            else:
+                # Queue the operation and use a different approach
+                result = [None]
+                exception = [None]
+
+                def run_and_store():
+                    try:
+                        result[0] = func(*args, **kwargs)
+                    except Exception as e:
+                        exception[0] = e
+
+                # For UI operations, we'll need to handle this differently
+                # Log a warning and try to run anyway
+                logger.warning(f"Running {func.__name__} from non-main thread")
+                run_and_store()
+
+                if exception[0]:
+                    raise exception[0]
+                return result[0]
+    return wrapper
+
+
 class MeetingRecApp(rumps.App):
+    """Main menu bar application - focused only on UI and menu management"""
+
     def __init__(self):
-        # Initialize the rumps.App with minimal config
-        script_dir = os.path.dirname(os.path.abspath(__file__))  # Gets the directory of menu_bar_app.py
+        # Initialize the rumps.App
+        script_dir = os.path.dirname(os.path.abspath(__file__))
         icon_path = os.path.join(script_dir, 'resources', 'icon.png')
 
         super(MeetingRecApp, self).__init__(
             name="MeetingRec",
-            title="",  # Keep title empty for icon-only display
-            icon=icon_path, 
+            title="",
+            icon=icon_path,
             template=True,
             quit_button="Quit"
         )
-        
-        # Initialize core components
+
+        # Initialize configuration
         self.config_manager = ConfigManager()
-        self.audio_recorder = AudioRecorder(self.config_manager)
-        self.screenshot_capture = ScreenshotCapture(self.config_manager)
-        
-        # Get markdown configuration
-        markdown_config = self.config_manager.get_markdown_config()
 
-        # Let the MarkdownExporter get defaults from config_manager
-        self.markdown_exporter = MarkdownExporter(
-            config_manager=self.config_manager
-        )
+        # Initialize recording workflow service with notification callback
+        self.recording_service = None
+        try:
+            self.recording_service = RecordingWorkflowService(
+                self.config_manager,
+                notification_callback=safe_notification
+            )
+            logger.info("Recording service initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize recording service: {e}")
+            # Don't crash the app - run in degraded mode
+            self._show_initialization_error(str(e))
+            # Continue initialization to allow config access
 
-        # Track current meeting
-        self.current_meeting_path = None
-        
-        # Create callbacks dictionary
+        # Create menu callbacks
         callbacks = {
             "start_recording": self.start_recording,
             "stop_recording": self.stop_recording,
@@ -56,245 +97,241 @@ class MeetingRecApp(rumps.App):
             "open_config": self.open_config,
             "check_system": self.check_system
         }
-        
-        # Initialize menu manager with callbacks
-        self.menu_manager = MenuManager(self, callbacks)
-        
-        # Run startup checks
-        self._run_preflight_checks()
-        self._check_first_run()
-        
-        logger.info("MeetingRecApp initialization complete")
-    
-    def _run_preflight_checks(self):
-        """Run dependency and permission checks on startup."""
-        # Since we're using lameenc instead of ffmpeg, we don't need dependency checks
-        # Just check for permissions if needed
-        permission_issues = error_manager.check_permissions()
-        
-        if permission_issues:
-            safe_notification(
-                "MeetingRec", 
-                "Permission Check",
-                f"Found {len(permission_issues)} permission issue(s). Check app permissions."
-            )
 
-    def _check_first_run(self):
-        """Check if this is the first run and show setup guidance."""
-        # Check if API key is configured
-        api_key = self.config_manager.get_openai_api_key()
-        if not api_key:
-            # Show first-run notification
+        # Initialize menu manager
+        self.menu_manager = MenuManager(self, callbacks)
+
+        # Run startup procedures
+        self._run_startup_checks()
+
+        logger.info("MeetingRecApp initialization complete")
+
+    def _show_initialization_error(self, error_message: str):
+        """Show initialization error to user"""
+        if "FFmpeg" in error_message:
+            self._show_ffmpeg_installation_dialog()
+        else:
             safe_notification(
                 "MeetingRec",
-                "Welcome to MeetingRec",
-                "Please configure your OpenAI API key in the config file."
+                "Initialization Error",
+                f"Failed to start: {error_message}"
             )
-            
-            # After a short delay, open the config
-            def delayed_open_config():
-                import time
-                time.sleep(1)
-                self.open_config(None)
-                
-            threading.Thread(target=delayed_open_config, daemon=True).start()
+
+    def _show_ffmpeg_installation_dialog(self):
+        """Show FFmpeg installation instructions with improved error handling"""
+        try:
+            instructions = FFmpegDependencyManager.get_installation_instructions()
+
+            safe_notification(
+                "MeetingRec",
+                "FFmpeg Required",
+                "FFmpeg is required for system audio recording."
+            )
+
+            logger.error(f"FFmpeg installation required:\n{instructions}")
+
+            # Use safe_main_thread wrapper with error handling
+            @safe_main_thread
+            def show_alert_on_main_thread():
+                try:
+                    rumps.alert(
+                        title="FFmpeg Required",
+                        message=instructions,
+                        ok="OK"
+                    )
+                except Exception as e:
+                    logger.error(f"Error showing alert dialog: {e}")
+                    # Fallback: print to console for debugging
+                    print(f"FFmpeg Required:\n{instructions}")
+
+            # Call the main thread function
+            show_alert_on_main_thread()
+        except Exception as e:
+            logger.error(f"Error in FFmpeg dialog: {e}")
+            # Minimal fallback notification
+            safe_notification(
+                "MeetingRec",
+                "Setup Required",
+                "Please install FFmpeg for audio recording."
+            )
+
+    def _run_startup_checks(self):
+        """Run startup checks and show guidance if needed"""
+        if not self.recording_service:
+            logger.warning(
+                "Recording service not available - running in degraded mode")
+            self._show_degraded_mode_guidance()
+            return
+
+        try:
+            # Check system status
+            status = self.recording_service.check_system_status()
+
+            if not status["overall_ready"]:
+                audio_issues = status["audio_recording"]["issues"]
+                if audio_issues:
+                    logger.warning(f"Audio system issues: {audio_issues}")
+
+            # Check API key configuration
+            if not status["openai_configured"]:
+                self._show_first_run_guidance()
+        except Exception as e:
+            logger.error(f"Error during startup checks: {e}")
+            # Continue anyway - don't let startup checks crash the app
+
+    def _show_first_run_guidance(self):
+        """Show first-run guidance for API key setup"""
+        safe_notification(
+            "MeetingRec",
+            "Welcome to MeetingRec",
+            "Please configure your OpenAI API key for transcription."
+        )
+
+        def delayed_open_config():
+            import time
+            time.sleep(1.5)
+            self.open_config(None)
+
+        threading.Thread(target=delayed_open_config, daemon=True).start()
+
+    def _show_degraded_mode_guidance(self):
+        """Show guidance when running in degraded mode"""
+        safe_notification(
+            "MeetingRec",
+            "Limited Mode",
+            "Some features unavailable. Check configuration."
+        )
 
     @safe_execute
     def start_recording(self, _):
-        logger.info("Start recording requested")
-        if self.audio_recorder.is_currently_recording():
-            safe_notification("MeetingRec", "Already Recording", "Recording is already in progress")
+        """Start recording workflow"""
+        if not self.recording_service:
+            safe_notification("MeetingRec", "Service Unavailable",
+                              "Recording service not available")
             return
-            
-        # Start recording
-        result = self.audio_recorder.start_recording()
-        
+
+        result = self.recording_service.start_recording()
+
         if result.get("success", False):
-            self.current_meeting_path = result["meeting_path"]
-            
-            # Set the meeting path in the screenshot capture
-            self.screenshot_capture.set_meeting_path(self.current_meeting_path)
-            
             # Update menu state
             self.menu_manager.set_menu_state("start_recording", False)
             self.menu_manager.set_menu_state("stop_recording", True)
-            
-            safe_notification("MeetingRec", "Recording Started", "")
-        else:
-            # Error is already handled by the safe_execute decorator
-            pass
+        # Error notification already handled by the service
 
     @safe_execute
     def stop_recording(self, _):
-        logger.info("Stop recording requested")
-        if not self.audio_recorder.is_currently_recording():
-            safe_notification("MeetingRec", "Not Recording", "No recording is in progress")
+        """Stop recording workflow"""
+        if not self.recording_service:
+            safe_notification("MeetingRec", "Service Unavailable",
+                              "Recording service not available")
             return
-            
-        # Stop recording
-        result = self.audio_recorder.stop_recording()
-        
+
+        result = self.recording_service.stop_recording()
+
         if result.get("success", False):
             # Update menu state
             self.menu_manager.set_menu_state("start_recording", True)
             self.menu_manager.set_menu_state("stop_recording", False)
-            
-            meeting_path = result.get("meeting_path", "")
-            safe_notification("MeetingRec", "Recording Stopped", f"Saved to: {meeting_path}")
-            
-            # Generate markdown report automatically
-            self._generate_markdown_for_meeting_path(meeting_path)
-        else:
-            # Error is already handled by the safe_execute decorator
-            pass
-
-    def _generate_markdown_for_meeting_path(self, meeting_path):
-        """Generate markdown for the meeting that just ended."""
-        if not meeting_path:
-            logger.error("Cannot generate markdown: No meeting path provided")
-            return
-        
-        # Convert string path to Path object if needed
-        if isinstance(meeting_path, str):
-            meeting_path = Path(meeting_path)
-        
-        logger.info(f"Automatically generating markdown for meeting: {meeting_path.name}")
-        
-        # Show notification that we're generating the report
-        safe_notification(
-            "MeetingRec",
-            "Generating Report",
-            f"Creating markdown report for: {meeting_path.name}"
-        )
-        
-        try:
-            # Generate the markdown report
-            report_path = self.markdown_exporter.generate_report(meeting_path)
-            
-            logger.info(f"Markdown report generated successfully: {report_path}")
-            
-            safe_notification(
-                "MeetingRec",
-                "Report Ready",
-                f"Report created and saved to: {report_path.name}"
-            )
-            
-            # Optionally open the report
-            # subprocess.run(["open", str(report_path)])
-        except Exception as e:
-            logger.error(f"Error generating markdown for {meeting_path.name}: {e}")
-            safe_notification(
-                "MeetingRec",
-                "Report Generation Failed",
-                f"Error: {str(e)}"
-            )
+        # Error notification already handled by the service
 
     @safe_execute
     def capture_screenshot(self, _):
-        logger.info("Screenshot capture requested")
-        if not self.current_meeting_path:
-            safe_notification(
-                "MeetingRec", 
-                "No Active Meeting", 
-                "Start recording first to capture screenshots"
-            )
+        """Capture screenshot for current meeting"""
+        if not self.recording_service:
+            safe_notification("MeetingRec", "Service Unavailable",
+                              "Recording service not available")
             return
-            
-        logger.info(f"Capturing screenshot for meeting: {self.current_meeting_path}")
-        
-        # Check if the screenshot capture has the meeting path set
-        if not self.screenshot_capture.current_meeting_path:
-            logger.error("Screenshot capture meeting path not set!")
-            # Try to set it again
-            self.screenshot_capture.set_meeting_path(self.current_meeting_path)
-        
-        result = self.screenshot_capture.capture_active_window()
-        
-        logger.info(f"Screenshot result: {result}")
-        
-        if result.get("success", False):
-            safe_notification(
-                "MeetingRec", 
-                "Screenshot Captured", 
-                f"From: {result.get('app_name', 'Unknown app')}"
-            )
-        else:
-            logger.error(f"Screenshot failed: {result.get('message', 'Unknown error')}")
-            safe_notification(
-                "MeetingRec",
-                "Screenshot Failed",
-                result.get('message', 'Failed to capture screenshot')
-            )
+
+        # Service handles the screenshot capture and notifications
+        self.recording_service.capture_screenshot()
 
     @safe_execute
     def open_config(self, _):
-        """Open the configuration file in the default editor."""
-        # Open the configuration file
-        self.config_manager.open_config_in_editor()
-        
-        # Log the action with detailed information for developers
-        logger.info("Configuration file opened - changes require application restart to take effect")
-        
-        # Use non-blocking notification to inform the user about restart requirement
-        safe_notification(
-            "MeetingRec", 
-            "Config Opened",
-            "If you make changes to the configuration, please restart the app for them to take effect."
-        )
+        """Open configuration file in text editor"""
+        try:
+            self.config_manager.open_config_in_editor()
+            safe_notification(
+                "MeetingRec",
+                "Config Opened",
+                "Configuration file opened in text editor. Restart after changes."
+            )
+        except Exception as e:
+            logger.error(f"Failed to open config file: {e}")
+            safe_notification(
+                "MeetingRec",
+                "Config Error",
+                f"Could not open config file: {e}"
+            )
 
     @safe_execute
     def check_system(self, _):
-        """Check system status and show notification."""
-        # We've removed dependency on external tools, so just show success
-        rumps.notification(
-            "MeetingRec",
-            "System Check",
-            "All systems ready. No external dependencies required."
-        )
+        """Check and display system status"""
+        if not self.recording_service:
+            safe_notification("MeetingRec", "Service Unavailable",
+                              "Recording service not available")
+            return
+
+        status = self.recording_service.check_system_status()
+
+        if status["overall_ready"]:
+            ffmpeg_version = status["audio_recording"].get(
+                "ffmpeg_version", "OK")
+            safe_notification(
+                "MeetingRec",
+                "System Check",
+                f"All systems ready. FFmpeg: {ffmpeg_version}"
+            )
+        else:
+            issues = status["audio_recording"]["issues"]
+            issues_text = "; ".join(issues) if issues else "Unknown issues"
+            safe_notification(
+                "MeetingRec",
+                "System Issues",
+                f"Issues found: {issues_text}"
+            )
 
     @safe_execute
     def show_meetings(self, _):
-        """Open the meetings folder in Finder."""
+        """Open meetings folder in Finder"""
         meetings_dir = self.config_manager.get_output_dir()
-        logger.info(f"Opening meetings directory: {meetings_dir}")
-        
-        # Open the folder in Finder using the 'open' command
         subprocess.run(["open", meetings_dir])
-        
+
         safe_notification(
             "MeetingRec",
             "Meetings Folder",
-            "Opened meetings folder in Finder"
+            "Opened in Finder"
         )
 
     def quit_application(self):
-        """Handle application quit event and perform cleanup before exit."""
-        logger.info("Application quitting - performing cleanup...")
-        
-        # Stop recording if in progress
-        if hasattr(self, 'audio_recorder') and self.audio_recorder.is_currently_recording():
-            logger.info("Stopping active recording before quit")
-            try:
-                self.audio_recorder.stop_recording()
-            except Exception as e:
-                logger.error(f"Error stopping recording during quit: {e}")
-        
-        logger.info("Application cleanup complete")
+        """Handle application quit - delegate cleanup to service"""
+        logger.info("Application quitting...")
+
+        if self.recording_service:
+            self.recording_service.cleanup_on_exit()
+
+        logger.info("Application quit complete")
         return True
 
+
 if __name__ == "__main__":
-    # Set up exception handling for the main thread
     try:
         MeetingRecApp().run()
     except Exception as e:
-        # Get error info
         error_info = error_manager.capture_exception("Application startup")
-        
-        # Show fatal error dialog
-        rumps.alert(
-            title="Fatal Error",
-            message=f"MeetingRec encountered a fatal error and needs to close:\n\n{error_info.get('message', 'Unknown error')}",
-            ok="Quit"
-        )
-        
+
+        # Use safe main thread for alert
+        @safe_main_thread
+        def show_error_alert():
+            try:
+                rumps.alert(
+                    title="Fatal Error",
+                    message=f"MeetingRec failed to start:\n\n{error_info.get('message', 'Unknown error')}",
+                    ok="Quit"
+                )
+            except Exception as alert_error:
+                logger.error(f"Failed to show error alert: {alert_error}")
+                print(
+                    f"FATAL ERROR: {error_info.get('message', 'Unknown error')}")
+
+        show_error_alert()
         sys.exit(1)
