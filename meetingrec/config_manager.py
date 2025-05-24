@@ -16,8 +16,8 @@ class ConfigManager:
             "audio": {
                 "format": "mp3",
                 "sample_rate": 44100,
-                "channel": "stereo",
-                "bitrate": "128k",
+                "channel": "mono",
+                "bitrate": "96k",
                 "quality": "medium"
             },
             "screenshot": {
