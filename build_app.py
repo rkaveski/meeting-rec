@@ -59,20 +59,63 @@ def build_app():
     # Clean previous builds
     for dir_name in ['build', 'dist']:
         if os.path.exists(dir_name):
+            print(f"Cleaning {dir_name} directory...")
             shutil.rmtree(dir_name)
     
-    # Run py2app
-    subprocess.run([
-        'python3', 'setup.py', 'py2app', '--packages=meetingrec'
-    ], check=True)
-    
-    # Check if build was successful
-    app_path = Path('dist/MeetingRec.app')
-    if not app_path.exists():
-        print("Failed to build application bundle.")
+    # Run py2app with better error handling
+    try:
+        print("Running py2app build...")
+        result = subprocess.run([
+            'python3', 'setup.py', 'py2app', '--packages=meetingrec'
+        ], check=True, capture_output=True, text=True)
+        
+        print("py2app completed successfully")
+        if result.stdout:
+            print("Build output:", result.stdout[-500:])  # Show last 500 chars
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Build failed with exit code {e.returncode}")
+        print(f"Error output: {e.stderr}")
+        if e.stdout:
+            print(f"Standard output: {e.stdout}")
+        return False
+    except Exception as e:
+        print(f"Unexpected error during build: {e}")
         return False
     
-    print(f"Application bundle v{version} created at: {app_path}")
+    # Verify build results
+    app_path = Path('dist/MeetingRec.app')
+    if not app_path.exists():
+        print("ERROR: Application bundle was not created")
+        print("Contents of dist directory:")
+        if Path('dist').exists():
+            for item in Path('dist').iterdir():
+                print(f"  {item}")
+        else:
+            print("  dist directory does not exist")
+        return False
+    
+    # Verify the app bundle structure
+    required_paths = [
+        app_path / 'Contents',
+        app_path / 'Contents' / 'MacOS',
+        app_path / 'Contents' / 'Resources',
+        app_path / 'Contents' / 'Info.plist'
+    ]
+    
+    for required_path in required_paths:
+        if not required_path.exists():
+            print(f"ERROR: Missing required app bundle component: {required_path}")
+            return False
+    
+    # Check if our version file made it into the bundle
+    version_file = app_path / 'Contents' / 'Resources' / 'lib' / 'python3.11' / 'meetingrec' / 'version.py'
+    if version_file.exists():
+        print(f"✓ Version file found in app bundle")
+    else:
+        print(f"WARNING: Version file not found at expected location: {version_file}")
+    
+    print(f"✓ Application bundle v{version} created successfully at: {app_path}")
     return True
 
 def code_sign_app():
@@ -100,9 +143,27 @@ def code_sign_app():
         print("Skipping code signing.")
 
 if __name__ == "__main__":
-    if build_app():
-        code_sign_app()
-        print("Build completed successfully.")
-    else:
-        print("Build failed.")
+    try:
+        print("=" * 50)
+        print("MeetingRec Build Script")
+        print("=" * 50)
+        
+        if build_app():
+            code_sign_app()
+            print("\n" + "=" * 50)
+            print("✓ Build completed successfully!")
+            print("=" * 50)
+        else:
+            print("\n" + "=" * 50)
+            print("✗ Build failed!")
+            print("=" * 50)
+            sys.exit(1)
+            
+    except KeyboardInterrupt:
+        print("\n\nBuild interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n\nUnexpected error in build script: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
