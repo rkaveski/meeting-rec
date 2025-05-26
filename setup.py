@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 APP = ['run.py']
 APP_NAME = "MeetingRec"
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 OPTIONS = {
     'argv_emulation': False,
