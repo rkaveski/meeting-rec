@@ -82,97 +82,21 @@ class ConfigManager:
     def _create_default_config(self) -> None:
         """Create a default configuration file with documentation."""
         self.config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Add comments to the YAML for better user experience
+        config_with_comments = f"""# MeetingRec Configuration File
+        # This file controls all aspects of the MeetingRec application
 
+        {yaml.dump(self.DEFAULT_CONFIG, default_flow_style=False, indent=2, sort_keys=False)}
+
+        # Note: FFmpeg is required for system audio recording.
+        # Install with: brew install ffmpeg
+        # Get your OpenAI API key from: https://platform.openai.com/api-keys
+        """
+        
         with open(self.config_path, 'w') as f:
-            f.write("# MeetingRec Configuration File\n")
-            f.write(
-                "# This file controls all aspects of the MeetingRec application\n\n")
-
-            f.write("meetingrec:\n")
-            f.write("  # Directory where meeting recordings are saved\n")
-            f.write(
-                f"  output_dir: {self.DEFAULT_CONFIG['meetingrec']['output_dir']}\n\n")
-
-            f.write("  # System audio recording settings (using FFmpeg)\n")
-            f.write("  audio:\n")
-            f.write("    # Output audio format (mp3, wav, m4a)\n")
-            f.write(
-                f"    format: {self.DEFAULT_CONFIG['meetingrec']['audio']['format']}\n")
-            f.write("    # Audio sample rate (Hz)\n")
-            f.write(
-                f"    sample_rate: {self.DEFAULT_CONFIG['meetingrec']['audio']['sample_rate']}\n")
-            f.write("    # Audio channels (mono, stereo)\n")
-            f.write(
-                f"    channel: {self.DEFAULT_CONFIG['meetingrec']['audio']['channel']}\n")
-            f.write(
-                "    # Audio bitrate for compressed formats (e.g., 128k, 192k, 256k)\n")
-            f.write(
-                f"    bitrate: {self.DEFAULT_CONFIG['meetingrec']['audio']['bitrate']}\n")
-            f.write("    # Audio quality (high, medium, low)\n")
-            f.write(
-                f"    quality: {self.DEFAULT_CONFIG['meetingrec']['audio']['quality']}\n\n")
-
-            f.write("  # Screenshot settings\n")
-            f.write("  screenshot:\n")
-            f.write("    # Output image format (jpg)\n")
-            f.write(
-                f"    format: {self.DEFAULT_CONFIG['meetingrec']['screenshot']['format']}\n")
-            f.write("    # Image quality (for jpg)\n")
-            f.write(
-                f"    quality: {self.DEFAULT_CONFIG['meetingrec']['screenshot']['quality']}\n\n")
-
-            f.write("  # Markdown export settings\n")
-            f.write("  markdown:\n")
-            f.write("    # Maximum width for embedded images (in pixels)\n")
-            f.write(
-                f"    max_image_width: {self.DEFAULT_CONFIG['meetingrec']['markdown']['max_image_width']}\n")
-            f.write("    # JPEG quality for embedded images (0-100)\n")
-            f.write(
-                f"    jpeg_quality: {self.DEFAULT_CONFIG['meetingrec']['markdown']['jpeg_quality']}\n")
-            f.write("    # Maximum seconds to wait for transcript generation\n")
-            f.write(
-                f"    transcript_wait_seconds: {self.DEFAULT_CONFIG['meetingrec']['markdown']['transcript_wait_seconds']}\n\n")
-
-            f.write("  # Meeting app detection settings\n")
-            f.write("  meeting_app_detection:\n")
-            f.write("    # Enable automatic detection of meeting applications\n")
-            f.write(
-                f"    enabled: {self.DEFAULT_CONFIG['meetingrec']['meeting_app_detection']['enabled']}\n\n")
-
-            f.write("  # AI settings (for transcription and insights)\n")
-            f.write("  ai:\n")
-            f.write(
-                "    # Your OpenAI API key - required for transcription and AI features\n")
-            f.write(
-                "    # Get your API key from: https://platform.openai.com/api-keys\n")
-            f.write(
-                f"    openai_api_key: {self.DEFAULT_CONFIG['meetingrec']['ai']['openai_api_key']}\n")
-            f.write("    # Whisper model for transcription\n")
-            f.write(
-                f"    whisper_model: {self.DEFAULT_CONFIG['meetingrec']['ai']['whisper_model']}\n")
-            f.write("    # GPT model for summaries and insights\n")
-            f.write(
-                f"    model: {self.DEFAULT_CONFIG['meetingrec']['ai']['model']}\n")
-            f.write(
-                "    # AI temperature parameter (0.0-1.0, lower = more focused)\n")
-            f.write(
-                f"    temperature: {self.DEFAULT_CONFIG['meetingrec']['ai']['temperature']}\n")
-            f.write("    # Maximum tokens for AI responses\n")
-            f.write(
-                f"    max_tokens: {self.DEFAULT_CONFIG['meetingrec']['ai']['max_tokens']}\n\n")
-
-            f.write("  # Application settings\n")
-            f.write("  app:\n")
-            f.write("    # First run flag for initial setup\n")
-            f.write(
-                f"    first_run: {self.DEFAULT_CONFIG['meetingrec']['app']['first_run']}\n")
-            f.write("    # Whether FFmpeg notification has been shown\n")
-            f.write(
-                f"    ffmpeg_notification_shown: {self.DEFAULT_CONFIG['meetingrec']['app']['ffmpeg_notification_shown']}\n\n")
-
-            f.write("# Note: FFmpeg is required for system audio recording.\n")
-            f.write("# Install with: brew install ffmpeg\n")
-
+            f.write(config_with_comments)
+        
         print(f"Created default configuration at {self.config_path}")
 
     def _merge_with_defaults(self, config: Dict[str, Any]) -> Dict[str, Any]:
