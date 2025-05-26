@@ -85,14 +85,14 @@ class ConfigManager:
         
         # Add comments to the YAML for better user experience
         config_with_comments = f"""# MeetingRec Configuration File
-        # This file controls all aspects of the MeetingRec application
+# This file controls all aspects of the MeetingRec application
 
-        {yaml.dump(self.DEFAULT_CONFIG, default_flow_style=False, indent=2, sort_keys=False)}
+{yaml.dump(self.DEFAULT_CONFIG, default_flow_style=False, indent=2, sort_keys=False)}
 
-        # Note: FFmpeg is required for system audio recording.
-        # Install with: brew install ffmpeg
-        # Get your OpenAI API key from: https://platform.openai.com/api-keys
-        """
+# Note: FFmpeg is required for system audio recording.
+# Install with: brew install ffmpeg
+# Get your OpenAI API key from: https://platform.openai.com/api-keys
+"""
         
         with open(self.config_path, 'w') as f:
             f.write(config_with_comments)
