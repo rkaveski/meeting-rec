@@ -2,6 +2,7 @@ import os
 import subprocess
 import logging
 import time
+import glob
 
 from datetime import datetime
 from pathlib import Path
@@ -52,13 +53,33 @@ class FFmpegDependencyManager:
 
         # Common paths where FFmpeg might be installed
         additional_paths = [
+            "/opt/homebrew/bin",        # Homebrew on Apple Silicon (most common)
             "/usr/local/bin",           # Homebrew default
-            "/opt/homebrew/bin",        # Homebrew on Apple Silicon
             "/usr/bin",                 # System binaries
             "/bin",                     # Core binaries
             "/usr/local/sbin",          # Additional system binaries
             "/opt/local/bin",           # MacPorts
+            "/usr/local/Cellar/ffmpeg/*/bin",  # Homebrew ffmpeg specific paths
         ]
+
+        # Try to get user's shell PATH for packaged apps
+        try:
+            # Get PATH from user's shell environment
+            shell_result = subprocess.run(
+                ["bash", "-l", "-c", "echo $PATH"],
+                capture_output=True,
+                text=True,
+                timeout=3
+            )
+            if shell_result.returncode == 0 and shell_result.stdout.strip():
+                shell_path = shell_result.stdout.strip()
+                logger.debug(f"Got shell PATH: {shell_path}")
+                # Merge shell PATH with current PATH
+                current_path = env.get("PATH", "")
+                combined_path = f"{shell_path}:{current_path}" if current_path else shell_path
+                env["PATH"] = combined_path
+        except Exception as e:
+            logger.debug(f"Could not get shell PATH: {e}")
 
         # Get current PATH and add additional paths
         current_path = env.get("PATH", "")
@@ -66,7 +87,16 @@ class FFmpegDependencyManager:
 
         # Add paths that aren't already included
         for path in additional_paths:
-            if path not in path_list:
+            if "*" in path:
+                # Handle glob patterns for Homebrew paths
+                try:
+                    expanded_paths = glob.glob(path)
+                    for expanded_path in expanded_paths:
+                        if expanded_path not in path_list and os.path.isdir(expanded_path):
+                            path_list.insert(0, expanded_path)
+                except Exception:
+                    continue
+            elif path not in path_list:
                 path_list.insert(0, path)  # Prepend to give priority
 
         env["PATH"] = ":".join(path_list)
@@ -77,7 +107,7 @@ class FFmpegDependencyManager:
     @staticmethod
     def _find_ffmpeg_executable() -> Optional[str]:
         """Find FFmpeg executable in common locations"""
-        # Try with 'which' command first
+        # Try with 'which' command first using enhanced environment
         try:
             result = subprocess.run(
                 ["which", "ffmpeg"],
@@ -93,19 +123,58 @@ class FFmpegDependencyManager:
         except Exception as e:
             logger.debug(f"'which ffmpeg' failed: {e}")
 
+        # Try with 'whereis' command as fallback
+        try:
+            result = subprocess.run(
+                ["whereis", "ffmpeg"],
+                capture_output=True,
+                timeout=5,
+                text=True,
+                env=FFmpegDependencyManager._get_enhanced_env()
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # whereis returns "ffmpeg: /path/to/ffmpeg"
+                output = result.stdout.strip()
+                if ":" in output:
+                    paths = output.split(":")[1].strip().split()
+                    for path in paths:
+                        if os.path.isfile(path) and os.access(path, os.X_OK):
+                            logger.info(f"Found FFmpeg via 'whereis': {path}")
+                            return path
+        except Exception as e:
+            logger.debug(f"'whereis ffmpeg' failed: {e}")
+
         # Try common installation paths directly
         common_paths = [
-            "/usr/local/bin/ffmpeg",
-            "/opt/homebrew/bin/ffmpeg",
-            "/usr/bin/ffmpeg",
-            "/bin/ffmpeg",
-            "/opt/local/bin/ffmpeg"
+            "/opt/homebrew/bin/ffmpeg",  # Homebrew on Apple Silicon (most common)
+            "/usr/local/bin/ffmpeg",     # Homebrew default
+            "/usr/bin/ffmpeg",           # System binaries
+            "/bin/ffmpeg",               # Core binaries
+            "/opt/local/bin/ffmpeg",     # MacPorts
         ]
+
+        # Add Homebrew Cellar paths with version detection
+        try:
+            cellar_paths = glob.glob("/usr/local/Cellar/ffmpeg/*/bin/ffmpeg")
+            cellar_paths.extend(glob.glob("/opt/homebrew/Cellar/ffmpeg/*/bin/ffmpeg"))
+            common_paths.extend(cellar_paths)
+        except Exception:
+            pass
 
         for path in common_paths:
             if os.path.isfile(path) and os.access(path, os.X_OK):
                 logger.info(f"Found FFmpeg at: {path}")
                 return path
+
+        # Last resort: search in PATH manually
+        env = FFmpegDependencyManager._get_enhanced_env()
+        path_env = env.get("PATH", "")
+        for path_dir in path_env.split(":"):
+            if path_dir.strip():
+                ffmpeg_path = os.path.join(path_dir.strip(), "ffmpeg")
+                if os.path.isfile(ffmpeg_path) and os.access(ffmpeg_path, os.X_OK):
+                    logger.info(f"Found FFmpeg via PATH search: {ffmpeg_path}")
+                    return ffmpeg_path
 
         logger.warning("FFmpeg not found in any common locations")
         return None
