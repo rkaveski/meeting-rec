@@ -11,7 +11,7 @@ from meetingrec.recording_workflow_service import RecordingWorkflowService
 from meetingrec.config_manager import ConfigManager
 from meetingrec.error_manager import error_manager, safe_execute, safe_notification
 from meetingrec.menu_manager import MenuManager
-from meetingrec.system_audio_recorder import FFmpegDependencyManager
+
 
 logger = logging.getLogger("meetingrec.menu_bar")
 
@@ -74,6 +74,10 @@ class MeetingRecApp(rumps.App):
         # Initialize configuration
         self.config_manager = ConfigManager()
 
+        # Check for first run and show welcome notification
+        if self.config_manager.is_first_run():
+            self._show_first_run_setup()
+
         # Initialize recording workflow service with notification callback
         self.recording_service = None
         try:
@@ -85,7 +89,6 @@ class MeetingRecApp(rumps.App):
         except Exception as e:
             logger.error(f"Failed to initialize recording service: {e}")
             # Don't crash the app - run in degraded mode
-            self._show_initialization_error(str(e))
             # Continue initialization to allow config access
 
         # Create menu callbacks
@@ -106,54 +109,15 @@ class MeetingRecApp(rumps.App):
 
         logger.info("MeetingRecApp initialization complete")
 
-    def _show_initialization_error(self, error_message: str):
-        """Show initialization error to user"""
-        if "FFmpeg" in error_message:
-            self._show_ffmpeg_installation_dialog()
-        else:
-            safe_notification(
-                "MeetingRec",
-                "Initialization Error",
-                f"Failed to start: {error_message}"
-            )
-
-    def _show_ffmpeg_installation_dialog(self):
-        """Show FFmpeg installation instructions with improved error handling"""
-        try:
-            instructions = FFmpegDependencyManager.get_installation_instructions()
-
-            safe_notification(
-                "MeetingRec",
-                "FFmpeg Required",
-                "FFmpeg is required for system audio recording."
-            )
-
-            logger.error(f"FFmpeg installation required:\n{instructions}")
-
-            # Use safe_main_thread wrapper with error handling
-            @safe_main_thread
-            def show_alert_on_main_thread():
-                try:
-                    rumps.alert(
-                        title="FFmpeg Required",
-                        message=instructions,
-                        ok="OK"
-                    )
-                except Exception as e:
-                    logger.error(f"Error showing alert dialog: {e}")
-                    # Fallback: print to console for debugging
-                    print(f"FFmpeg Required:\n{instructions}")
-
-            # Call the main thread function
-            show_alert_on_main_thread()
-        except Exception as e:
-            logger.error(f"Error in FFmpeg dialog: {e}")
-            # Minimal fallback notification
-            safe_notification(
-                "MeetingRec",
-                "Setup Required",
-                "Please install FFmpeg for audio recording."
-            )
+    def _show_first_run_setup(self):
+        """Show first-run setup notification"""
+        safe_notification(
+            "MeetingRec",
+            "Welcome to MeetingRec", 
+            "Please install FFmpeg for audio recording: brew install ffmpeg"
+        )
+        # Mark first run as complete
+        self.config_manager.set_first_run_complete()
 
     def _run_startup_checks(self):
         """Run startup checks and show guidance if needed"""

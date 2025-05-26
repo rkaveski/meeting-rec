@@ -38,6 +38,10 @@ class ConfigManager:
                 "temperature": 0.2,
                 "max_tokens": 2048,
                 "whisper_model": "whisper-1"
+            },
+            "app": {
+                "first_run": True,
+                "ffmpeg_notification_shown": False
             }
         }
     }
@@ -157,6 +161,15 @@ class ConfigManager:
             f.write(
                 f"    max_tokens: {self.DEFAULT_CONFIG['meetingrec']['ai']['max_tokens']}\n\n")
 
+            f.write("  # Application settings\n")
+            f.write("  app:\n")
+            f.write("    # First run flag for initial setup\n")
+            f.write(
+                f"    first_run: {self.DEFAULT_CONFIG['meetingrec']['app']['first_run']}\n")
+            f.write("    # Whether FFmpeg notification has been shown\n")
+            f.write(
+                f"    ffmpeg_notification_shown: {self.DEFAULT_CONFIG['meetingrec']['app']['ffmpeg_notification_shown']}\n\n")
+
             f.write("# Note: FFmpeg is required for system audio recording.\n")
             f.write("# Install with: brew install ffmpeg\n")
 
@@ -267,6 +280,34 @@ class ConfigManager:
         except Exception as e:
             print(f"Error hashing config: {e}")
             return ""
+
+    def is_first_run(self) -> bool:
+        """Check if this is the first run of the application"""
+        try:
+            return self.config["meetingrec"]["app"].get("first_run", True)
+        except (KeyError, TypeError):
+            return True
+
+    def set_first_run_complete(self) -> None:
+        """Mark first run as complete"""
+        if "app" not in self.config["meetingrec"]:
+            self.config["meetingrec"]["app"] = {}
+        self.config["meetingrec"]["app"]["first_run"] = False
+        self.save_config()
+
+    def is_ffmpeg_notification_shown(self) -> bool:
+        """Check if FFmpeg notification has been shown"""
+        try:
+            return self.config["meetingrec"]["app"].get("ffmpeg_notification_shown", False)
+        except (KeyError, TypeError):
+            return False
+
+    def set_ffmpeg_notification_shown(self) -> None:
+        """Mark FFmpeg notification as shown"""
+        if "app" not in self.config["meetingrec"]:
+            self.config["meetingrec"]["app"] = {}
+        self.config["meetingrec"]["app"]["ffmpeg_notification_shown"] = True
+        self.save_config()
 
 
 if __name__ == "__main__":

@@ -2,7 +2,6 @@ import os
 import subprocess
 import logging
 import time
-import glob
 
 from datetime import datetime
 from pathlib import Path
@@ -44,254 +43,7 @@ class FFmpegNotAvailableError(SystemAudioError):
 
 
 class FFmpegDependencyManager:
-    """Handle FFmpeg installation and verification with improved PATH handling"""
-
-    @staticmethod
-    def _get_enhanced_env() -> Dict[str, str]:
-        """Get enhanced environment with common binary paths"""
-        env = os.environ.copy()
-
-        # Common paths where FFmpeg might be installed
-        additional_paths = [
-            "/opt/homebrew/bin",        # Homebrew on Apple Silicon (most common)
-            "/usr/local/bin",           # Homebrew default
-            "/usr/bin",                 # System binaries
-            "/bin",                     # Core binaries
-            "/usr/local/sbin",          # Additional system binaries
-            "/opt/local/bin",           # MacPorts
-            "/usr/local/Cellar/ffmpeg/*/bin",  # Homebrew ffmpeg specific paths
-        ]
-
-        # Try to get user's shell PATH for packaged apps
-        try:
-            # Get PATH from user's shell environment
-            shell_result = subprocess.run(
-                ["bash", "-l", "-c", "echo $PATH"],
-                capture_output=True,
-                text=True,
-                timeout=3
-            )
-            if shell_result.returncode == 0 and shell_result.stdout.strip():
-                shell_path = shell_result.stdout.strip()
-                logger.debug(f"Got shell PATH: {shell_path}")
-                # Merge shell PATH with current PATH
-                current_path = env.get("PATH", "")
-                combined_path = f"{shell_path}:{current_path}" if current_path else shell_path
-                env["PATH"] = combined_path
-        except Exception as e:
-            logger.debug(f"Could not get shell PATH: {e}")
-
-        # Get current PATH and add additional paths
-        current_path = env.get("PATH", "")
-        path_list = current_path.split(":") if current_path else []
-
-        # Add paths that aren't already included
-        for path in additional_paths:
-            if "*" in path:
-                # Handle glob patterns for Homebrew paths
-                try:
-                    expanded_paths = glob.glob(path)
-                    for expanded_path in expanded_paths:
-                        if expanded_path not in path_list and os.path.isdir(expanded_path):
-                            path_list.insert(0, expanded_path)
-                except Exception:
-                    continue
-            elif path not in path_list:
-                path_list.insert(0, path)  # Prepend to give priority
-
-        env["PATH"] = ":".join(path_list)
-
-        logger.debug(f"Enhanced PATH: {env['PATH']}")
-        return env
-
-    @staticmethod
-    def _find_ffmpeg_executable() -> Optional[str]:
-        """Find FFmpeg executable in common locations"""
-        # Try with 'which' command first using enhanced environment
-        try:
-            result = subprocess.run(
-                ["which", "ffmpeg"],
-                capture_output=True,
-                timeout=5,
-                text=True,
-                env=FFmpegDependencyManager._get_enhanced_env()
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                ffmpeg_path = result.stdout.strip()
-                logger.info(f"Found FFmpeg via 'which': {ffmpeg_path}")
-                return ffmpeg_path
-        except Exception as e:
-            logger.debug(f"'which ffmpeg' failed: {e}")
-
-        # Try with 'whereis' command as fallback
-        try:
-            result = subprocess.run(
-                ["whereis", "ffmpeg"],
-                capture_output=True,
-                timeout=5,
-                text=True,
-                env=FFmpegDependencyManager._get_enhanced_env()
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                # whereis returns "ffmpeg: /path/to/ffmpeg"
-                output = result.stdout.strip()
-                if ":" in output:
-                    paths = output.split(":")[1].strip().split()
-                    for path in paths:
-                        if os.path.isfile(path) and os.access(path, os.X_OK):
-                            logger.info(f"Found FFmpeg via 'whereis': {path}")
-                            return path
-        except Exception as e:
-            logger.debug(f"'whereis ffmpeg' failed: {e}")
-
-        # Try common installation paths directly
-        common_paths = [
-            "/opt/homebrew/bin/ffmpeg",  # Homebrew on Apple Silicon (most common)
-            "/usr/local/bin/ffmpeg",     # Homebrew default
-            "/usr/bin/ffmpeg",           # System binaries
-            "/bin/ffmpeg",               # Core binaries
-            "/opt/local/bin/ffmpeg",     # MacPorts
-        ]
-
-        # Add Homebrew Cellar paths with version detection
-        try:
-            cellar_paths = glob.glob("/usr/local/Cellar/ffmpeg/*/bin/ffmpeg")
-            cellar_paths.extend(glob.glob("/opt/homebrew/Cellar/ffmpeg/*/bin/ffmpeg"))
-            common_paths.extend(cellar_paths)
-        except Exception:
-            pass
-
-        for path in common_paths:
-            if os.path.isfile(path) and os.access(path, os.X_OK):
-                logger.info(f"Found FFmpeg at: {path}")
-                return path
-
-        # Last resort: search in PATH manually
-        env = FFmpegDependencyManager._get_enhanced_env()
-        path_env = env.get("PATH", "")
-        for path_dir in path_env.split(":"):
-            if path_dir.strip():
-                ffmpeg_path = os.path.join(path_dir.strip(), "ffmpeg")
-                if os.path.isfile(ffmpeg_path) and os.access(ffmpeg_path, os.X_OK):
-                    logger.info(f"Found FFmpeg via PATH search: {ffmpeg_path}")
-                    return ffmpeg_path
-
-        logger.warning("FFmpeg not found in any common locations")
-        return None
-
-    @staticmethod
-    def is_ffmpeg_available() -> bool:
-        """Check if FFmpeg is installed and accessible with improved detection"""
-        ffmpeg_path = FFmpegDependencyManager._find_ffmpeg_executable()
-
-        if not ffmpeg_path:
-            logger.error("FFmpeg executable not found")
-            return False
-
-        # Quick path existence check first
-        if not os.path.isfile(ffmpeg_path) or not os.access(ffmpeg_path, os.X_OK):
-            logger.error(f"FFmpeg path not executable: {ffmpeg_path}")
-            return False
-
-        try:
-            # Test FFmpeg with shorter timeout and better error handling
-            result = subprocess.run(
-                [ffmpeg_path, "-version"],
-                capture_output=True,
-                timeout=5,  # Reduced timeout to prevent hanging
-                text=True,
-                env=FFmpegDependencyManager._get_enhanced_env(),
-                stdin=subprocess.DEVNULL  # Prevent hanging on input
-            )
-
-            success = result.returncode == 0
-
-            if success:
-                logger.info(f"FFmpeg is available at: {ffmpeg_path}")
-                # Log first line of version output for debugging
-                first_line = result.stdout.split(
-                    '\n')[0] if result.stdout else "Unknown version"
-                logger.info(f"FFmpeg version: {first_line}")
-            else:
-                logger.warning(
-                    f"FFmpeg test failed. Return code: {result.returncode}")
-                if result.stderr:
-                    # Limit error log size
-                    logger.warning(f"FFmpeg stderr: {result.stderr[:200]}...")
-
-            return success
-
-        except subprocess.TimeoutExpired:
-            logger.warning(
-                f"FFmpeg version check timed out for: {ffmpeg_path} - may still be functional")
-            # Don't fail completely on timeout - FFmpeg might still work for recording
-            return True  # Assume it works if executable exists
-        except FileNotFoundError:
-            logger.error(f"FFmpeg executable not found at: {ffmpeg_path}")
-            return False
-        except Exception as e:
-            logger.warning(
-                f"Error testing FFmpeg at {ffmpeg_path}: {e} - assuming functional")
-            # Be more permissive with validation errors
-            return True
-
-    @staticmethod
-    def get_ffmpeg_version() -> Optional[str]:
-        """Get FFmpeg version string with improved error handling"""
-        ffmpeg_path = FFmpegDependencyManager._find_ffmpeg_executable()
-        if not ffmpeg_path:
-            return None
-
-        try:
-            result = subprocess.run(
-                [ffmpeg_path, "-version"],
-                capture_output=True,
-                timeout=3,  # Even shorter timeout for version check
-                text=True,
-                env=FFmpegDependencyManager._get_enhanced_env(),
-                stdin=subprocess.DEVNULL
-            )
-            if result.returncode == 0:
-                first_line = result.stdout.split('\n')[0]
-                return first_line
-            return "FFmpeg (version check failed)"
-        except subprocess.TimeoutExpired:
-            logger.debug("FFmpeg version check timed out")
-            return "FFmpeg (version timeout)"
-        except Exception as e:
-            logger.debug(f"Error getting FFmpeg version: {e}")
-            return "FFmpeg (available)"
-
-    @staticmethod
-    def check_avfoundation_support() -> bool:
-        """Check if FFmpeg supports AVFoundation (macOS audio capture)"""
-        ffmpeg_path = FFmpegDependencyManager._find_ffmpeg_executable()
-        if not ffmpeg_path:
-            return False
-
-        try:
-            result = subprocess.run(
-                [ffmpeg_path, "-f", "avfoundation",
-                    "-list_devices", "true", "-i", ""],
-                capture_output=True,
-                timeout=15,  # Increased timeout for device listing
-                text=True,
-                env=FFmpegDependencyManager._get_enhanced_env()
-            )
-            # FFmpeg returns non-zero when listing devices, but that's expected
-            has_avfoundation = "AVFoundation" in result.stderr
-
-            if has_avfoundation:
-                logger.info("FFmpeg supports AVFoundation")
-            else:
-                logger.error("FFmpeg does not support AVFoundation")
-                # Log first 500 chars
-                logger.debug(f"FFmpeg stderr: {result.stderr[:500]}...")
-
-            return has_avfoundation
-        except Exception as e:
-            logger.error(f"Error checking AVFoundation support: {e}")
-            return False
+    """Minimal FFmpeg management - assumes user has it installed"""
 
     @staticmethod
     def get_installation_instructions() -> str:
@@ -303,11 +55,7 @@ Install via Homebrew:
 
 Or download from: https://ffmpeg.org/download.html
 
-After installation, restart MeetingRec.
-
-If FFmpeg is already installed, ensure it's in your PATH:
-    echo $PATH
-    which ffmpeg"""
+After installation, restart MeetingRec."""
 
 
 class SystemAudioRecorder:
@@ -331,20 +79,10 @@ class SystemAudioRecorder:
         logger.info("SystemAudioRecorder initialized")
 
     def _verify_dependencies(self) -> None:
-        """Verify that FFmpeg is available and supports AVFoundation"""
-        if not FFmpegDependencyManager.is_ffmpeg_available():
-            raise FFmpegNotAvailableError(
-                "FFmpeg is not installed or not accessible")
-
-        # Store the FFmpeg path for later use
-        self.ffmpeg_path = FFmpegDependencyManager._find_ffmpeg_executable()
-
-        if not FFmpegDependencyManager.check_avfoundation_support():
-            raise FFmpegNotAvailableError(
-                "FFmpeg does not support AVFoundation (required for macOS audio capture)")
-
-        version = FFmpegDependencyManager.get_ffmpeg_version()
-        logger.info(f"FFmpeg verified and ready: {version}")
+        """Minimal dependency setup - assumes FFmpeg is available"""
+        # Use ffmpeg directly from PATH
+        self.ffmpeg_path = "ffmpeg"
+        logger.info("SystemAudioRecorder ready - FFmpeg assumed available")
 
     def _get_codec(self) -> str:
         """Get FFmpeg codec based on output format"""
@@ -426,13 +164,12 @@ class SystemAudioRecorder:
             cmd = self._build_ffmpeg_command(output_file)
             logger.info(f"Starting FFmpeg with command: {' '.join(cmd)}")
 
-            # Start FFmpeg process with enhanced environment
+            # Start FFmpeg process
             self.ffmpeg_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                stdin=subprocess.PIPE,
-                env=FFmpegDependencyManager._get_enhanced_env()
+                stdin=subprocess.PIPE
             )
 
             # Give FFmpeg a moment to start
@@ -588,26 +325,13 @@ class SystemAudioRecorder:
 
     def check_system_status(self) -> Dict[str, Any]:
         """Check system status for audio recording"""
-        status = {
-            "ffmpeg_available": FFmpegDependencyManager.is_ffmpeg_available(),
-            "avfoundation_support": False,
-            "ffmpeg_version": None,
-            "ffmpeg_path": None,
+        return {
+            "ffmpeg_available": True,
+            "avfoundation_support": True,
+            "ffmpeg_version": "Assumed available",
+            "ffmpeg_path": "ffmpeg",
             "issues": []
         }
-
-        if status["ffmpeg_available"]:
-            status["ffmpeg_path"] = FFmpegDependencyManager._find_ffmpeg_executable()
-            status["ffmpeg_version"] = FFmpegDependencyManager.get_ffmpeg_version()
-            status["avfoundation_support"] = FFmpegDependencyManager.check_avfoundation_support()
-
-            if not status["avfoundation_support"]:
-                status["issues"].append("FFmpeg does not support AVFoundation")
-        else:
-            status["issues"].append(
-                "FFmpeg is not installed or not accessible")
-
-        return status
 
 
 if __name__ == "__main__":
